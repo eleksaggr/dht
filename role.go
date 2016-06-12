@@ -1,5 +1,13 @@
 package dht
 
+import "io"
+
 type Role interface {
-	Handle(m *Message) error
+	Register(leaderHost string) error
+
+	Handle(m *Message, w io.Writer) error
+
+	OnGet(m *Message, w io.Writer) error
+	OnSet(m *Message, w io.Writer) error
+	OnDelete(m *Message, w io.Writer) error
 }

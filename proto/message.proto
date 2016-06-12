@@ -1,0 +1,13 @@
+package dht;
+
+message Message {
+    enum Action {REGISTER=100; UNREGISTER=101; GET=102; SET=103; DELETE=104;}
+
+    required Action action = 1;
+
+    optional bytes id = 2;
+    optional string key = 3;
+    optional string value = 4;
+    optional bool success = 5;
+    optional string host = 6;
+}
