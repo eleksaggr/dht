@@ -1,13 +1,11 @@
 package dht
 
-import "net"
-
 type Leader struct {
 	Follower
 }
 
-func (leader *Leader) Handle(conn net.Conn) (err error) {
-	err = leader.Follower.Handle(conn)
+func (leader *Leader) Handle(m *Message) (err error) {
+	err = leader.Follower.Handle(m)
 	if err != nil {
 		return err
 	}

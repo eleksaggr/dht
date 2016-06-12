@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -66,9 +67,25 @@ func (node *Node) Run() {
 			}
 			// Wrap this in a closure, so defer will close after whichever Handle function is called.
 			go func(conn net.Conn) {
-
-				node.role.Handle(conn)
 				defer node.Close()
+
+				// Read message from the connection.
+				buffer := make([]byte, 4096)
+				_, err := conn.Read(buffer)
+				if err != nil {
+					log.Printf("%v\n", err)
+					return
+				}
+
+				// Unmarshal protobuf message.
+				var message Message
+				if err := proto.Unmarshal(buffer, &message); err != nil {
+					log.Printf("%v\n", err)
+					return
+				}
+
+				// Pass to appropiate handler.
+				node.role.Handle(message)
 			}(conn)
 		}
 	}
