@@ -47,12 +47,12 @@ Leader nodes are the coordinators of the cluster. A given cluster can only have 
 
 ## REST API
 A Leader hosts a HTTP server on his `httpHost`. The following actions are available over HTTP:
-* **SET** - `httpHost/`
-* **GET** - `httpHost/{key}`
-* **DELETE** - `httpHost/{key}`
+* **SET** - `POST: http://host:port/`
+* **GET** - `GET: http://host:port/{key}`
+* **DELETE** - `DELETE: http://host:port/{key}`
 
 #### SET
-To set a key-value pair send a JSON document to the address `http://httpHost/`. The JSON document should be formatted as follows:
+To set a key-value pair send a JSON document to the address `http://host:port`. The JSON document should be formatted as follows:
 ```
 {
     "key": "[your key]",
@@ -61,11 +61,11 @@ To set a key-value pair send a JSON document to the address `http://httpHost/`. 
 ```
 
 #### GET
-To get a value from the table query the address `http://httpHost/{key}`, where `{key}` is the key you want to get the value for.
+To get a value from the table query the address `http://host:port/{key}`, where `{key}` is the key you want to get the value for.
 
 
 #### DELETE
-To get a value from the table query the address `http://httpHost/{key}`, where `{key}` is the key you want to delete from the table.
+To get a value from the table query the address `http://host:port/{key}`, where `{key}` is the key you want to delete from the table.
 
 ## License
 
