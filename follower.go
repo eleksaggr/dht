@@ -43,7 +43,6 @@ func (follower *Follower) Register(leaderHost string) (err error) {
 	}
 
 	data, err := proto.Marshal(message)
-	fmt.Printf("%v\n", data)
 	if err != nil {
 		return err
 	}
@@ -64,6 +63,8 @@ func (follower *Follower) Handle(m *Message, w io.Writer) (err error) {
 		err = follower.OnSet(m, w)
 	case Message_DELETE:
 		err = follower.OnDelete(m, w)
+	case Message_NOOP:
+		err = follower.OnNoop(m, w)
 	default:
 		err = errors.New("Unrecognized action in message.")
 	}
@@ -106,5 +107,9 @@ func (follower *Follower) OnDelete(m *Message, w io.Writer) (err error) {
 	delete(follower.table, m.GetKey())
 	follower.mutex.Unlock()
 
+	return nil
+}
+
+func (follower *Follower) OnNoop(m *Message, w io.Writer) error {
 	return nil
 }

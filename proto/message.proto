@@ -1,7 +1,7 @@
 package dht;
 
 message Message {
-    enum Action {REGISTER=100; UNREGISTER=101; GET=102; SET=103; DELETE=104;}
+    enum Action {REGISTER=100; UNREGISTER=101; GET=102; SET=103; DELETE=104; NOOP=105;}
 
     required Action action = 1;
 

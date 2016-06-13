@@ -10,4 +10,5 @@ type Role interface {
 	OnGet(m *Message, w io.Writer) error
 	OnSet(m *Message, w io.Writer) error
 	OnDelete(m *Message, w io.Writer) error
+	OnNoop(m *Message, w io.Writer) error
 }
