@@ -2,7 +2,6 @@ package dht
 
 import (
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"io"
 	"log"
@@ -42,7 +41,7 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 
 	// Add self to the cluster.
 	leader.cluster.Add(leader.id, leader.host)
-	fmt.Printf("Cluster: %v\n", len(leader.cluster))
+
 	// Start timeout check
 	go leader.checkTimeout()
 
