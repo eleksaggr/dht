@@ -3,6 +3,7 @@ package dht
 import (
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"log"
 	"net"
@@ -55,16 +56,20 @@ func (leader *Leader) Register(leaderHost string) (err error) {
 
 // Handle handles the different types of messages a Leader must process.
 func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
-	fmt.Printf("Leader is handling message...\n")
 	err = leader.Follower.Handle(m, w)
+	if err == nil {
+		return nil
+	}
 
 	switch m.GetAction() {
 	case Message_REGISTER:
-		fmt.Printf("Register event called.\n")
+		log.Printf("[EVENT]Leader handling REGISTER.\n")
 		err = leader.OnRegister(m, w)
 	case Message_UNREGISTER:
+		log.Printf("[EVENT]Leader handling UNREGISTER.\n")
 		err = leader.OnUnregister(m, w)
 	default:
+		log.Printf("[EVENT]Leader handling fell through.\nMessage: %v\n", m)
 		err = errors.New("Unrecognized action in message.")
 	}
 	return err
@@ -72,17 +77,136 @@ func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
 
 // OnRegister is called when a node tries to register with the Leader.
 func (leader *Leader) OnRegister(m *Message, w io.Writer) (err error) {
-	fmt.Printf("Adding node to cluster...\n")
 	var id [16]byte
 	copy(id[:], m.GetId())
 	leader.cluster.Add(uuid.UUID(id), m.GetHost())
 
-	fmt.Printf("Cluster has %v elements.\n", len(leader.cluster))
 	return nil
 }
 
 // OnUnregister is called when a node tries to unregister itself with the Leader.
 func (leader *Leader) OnUnregister(m *Message, w io.Writer) (err error) {
+	return nil
+}
+
+// Set advices the appropiate nodes to set the key-value pair.
+func (leader *Leader) Set(key, value string) (err error) {
+	rendezvous := NewRendezvous(crc32.NewIEEE())
+	for _, member := range leader.cluster {
+		rendezvous.Add(member.ID)
+	}
+
+	nodeIDs := rendezvous.TopN(key, 2)
+	nodes := make([]*clusterMember, len(nodeIDs))
+	for i, id := range nodeIDs {
+		for _, member := range leader.cluster {
+			if member.ID == id {
+				nodes[i] = member
+			}
+		}
+	}
+
+	message := Message{
+		Action: Message_SET.Enum(),
+		Key:    &key,
+		Value:  &value,
+	}
+
+	for _, node := range nodes {
+		conn, err := net.Dial("tcp", node.Host)
+		if err != nil {
+			return err
+		}
+		data, err := proto.Marshal(&message)
+		if err != nil {
+			return err
+		}
+		conn.Write(data)
+	}
+	return nil
+}
+
+// Get contacts the appropiate Node to get the value for the key.
+func (leader *Leader) Get(key string) (value string, err error) {
+	rendezvous := NewRendezvous(crc32.NewIEEE())
+	for _, member := range leader.cluster {
+		rendezvous.Add(member.ID)
+	}
+
+	nodeID := rendezvous.TopN(key, 1)[0]
+
+	var node *clusterMember
+	for _, member := range leader.cluster {
+		if member.ID == nodeID {
+			node = member
+		}
+	}
+
+	message := Message{
+		Action: Message_GET.Enum(),
+		Key:    &key,
+	}
+
+	conn, err := net.Dial("tcp", node.Host)
+	if err != nil {
+		return "", err
+	}
+	data, err := proto.Marshal(&message)
+	if err != nil {
+		return "", err
+	}
+	conn.Write(data)
+
+	buffer := make([]byte, 4096)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	if err := proto.Unmarshal(buffer[0:n], &message); err != nil {
+		return "", err
+	}
+
+	if !message.GetSuccess() {
+		return "", errors.New("Key not found.")
+	}
+
+	return message.GetValue(), nil
+}
+
+// Delete advices the appropiate nodes to delete the key.
+func (leader *Leader) Delete(key string) (err error) {
+	rendezvous := NewRendezvous(crc32.NewIEEE())
+	for _, member := range leader.cluster {
+		rendezvous.Add(member.ID)
+	}
+
+	nodeIDs := rendezvous.TopN(key, 2)
+	nodes := make([]*clusterMember, len(nodeIDs))
+	for i, id := range nodeIDs {
+		for _, member := range leader.cluster {
+			if member.ID == id {
+				nodes[i] = member
+			}
+		}
+	}
+
+	message := Message{
+		Action: Message_DELETE.Enum(),
+		Key:    &key,
+	}
+
+	for _, node := range nodes {
+		conn, err := net.Dial("tcp", node.Host)
+		if err != nil {
+			return err
+		}
+		data, err := proto.Marshal(&message)
+		if err != nil {
+			return err
+		}
+		conn.Write(data)
+	}
 	return nil
 }
 

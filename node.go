@@ -1,7 +1,6 @@
 package dht
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -50,6 +49,8 @@ func NewNode(host string, roleType Type) (node *Node, err error) {
 		return nil, err
 	}
 
+	log.Printf("Generated ID is %v\n", id)
+
 	node = &Node{
 		id: *id,
 
@@ -93,24 +94,19 @@ loop:
 		case <-node.stop:
 			break loop
 		default:
-			fmt.Printf("Waiting for connection...\n")
 			conn, err := node.Accept()
 			if err != nil {
 				log.Printf("Accept: %v\n", err)
 				return
 			}
-			fmt.Printf("Accepted connection.\n")
 			// Wrap this in a closure, so defer will close after whichever Handle function is called.
-
 			go func(conn net.Conn) {
 				defer conn.Close()
 
 				// Read message from the connection.
-				fmt.Printf("Reading from connection.\n")
 				buffer := make([]byte, 4096)
 				n, err := conn.Read(buffer)
 				if err != nil {
-
 					log.Printf("Read: %v\n", err)
 					return
 				}
@@ -119,7 +115,6 @@ loop:
 				copy(data, buffer)
 
 				// Unmarshal protobuf message.
-				fmt.Printf("Unmarshaling message...\n")
 				var message Message
 				if err = proto.Unmarshal(data, &message); err != nil {
 					log.Printf("Data: %v\n%v\n", buffer, err)
@@ -127,7 +122,6 @@ loop:
 				}
 
 				// Pass to appropiate handler.
-				fmt.Printf("Passing message...\n")
 				if err = node.role.Handle(&message, conn); err != nil {
 					log.Printf("Pass: %v\n", err)
 					return
