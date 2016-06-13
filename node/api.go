@@ -68,36 +68,14 @@ func HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDelete(w http.ResponseWriter, r *http.Request) {
-	// body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// if err = r.Body.Close(); err != nil {
-	// 	panic(err)
-	// }
-	//
-	// var data map[string]interface{}
-	// if err = json.Unmarshal(body, &data); err != nil {
-	// 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	// 	w.WriteHeader(422) // unprocessable entity
-	// 	if err = json.NewEncoder(w).Encode(err); err != nil {
-	// 		panic(err)
-	// 	}
-	// }
-	//
-	// key := data["key"].(string)
-	// value := data["value"].(string)
-	// message := dht.Message{
-	// 	Action: dht.Message_DELETE.Enum(),
-	// 	Key:    &key,
-	// 	Value:  &value,
-	// }
-	//
-	// err = server.Role().(*dht.Leader).Delete(key)
-	// if err != nil {
-	// 	w.Write([]byte(err.Error()))
-	// } else {
-	// 	w.Write([]byte("Success\n"))
-	// }
+	vars := mux.Vars(r)
+
+	key := vars["key"]
+
+	err := server.Role().(*dht.Leader).Delete(key)
+	if err != nil {
+		w.Write([]byte(err.Error()))
+	} else {
+		w.Write([]byte("Success"))
+	}
 }

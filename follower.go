@@ -113,6 +113,7 @@ func (follower *Follower) OnDelete(m *Message, w io.Writer) (err error) {
 	delete(follower.table, m.GetKey())
 	follower.mutex.Unlock()
 
+	log.Printf("Table after Delete: %v\n", follower.table)
 	return nil
 }
 
