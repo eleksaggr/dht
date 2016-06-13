@@ -46,27 +46,60 @@ Follower nodes do not coordinate anything in the cluster. A Follower only cares 
 Leader nodes are the coordinators of the cluster. A given cluster can only have one Leader. Followers must register themselves with the Leader of the cluster in order to operate. Every Leader is himself also a Follower. This means he is a Follower node like any other and can set, get or delete data.
 
 ## REST API
-A Leader hosts a HTTP server on his `httpHost`. The following actions are available over HTTP:
-* **SET** - `POST: http://host:port/`
-* **GET** - `GET: http://host:port/{key}`
-* **DELETE** - `DELETE: http://host:port/{key}`
+A Leader hosts a HTTP server on his `httpHost`. The following actions are available over HTTP:`
+* `POST http://host:port/keys/`
+* `GET http://host:port/keys/{key}`
+* `DELETE http://host:port/keys/{key}`
 
-#### SET
-To set a key-value pair send a JSON document to the address `http://host:port`. The JSON document should be formatted as follows:
+#### POST
+To set a key-value pair send a JSON document to the address `http://host:port/keys/`. The JSON document should be formatted as follows:
 ```
 {
     "key": "[your key]",
     "value": "[your value]"
 }
 ```
+If the data is stored correctly the following response will be delivered:
+```
+{
+    "success": true
+}
+```
+If there was a problem the JSON document will look like this:
+```
+{
+    "Error": "A description of the error"
+}
+```
 
 #### GET
-To get a value from the table query the address `http://host:port/{key}`, where `{key}` is the key you want to get the value for.
-
-
+To get a key-value pair query the address `http://host:port/keys/{key}`, where `{key}` is the key you want to get the value for.
+If the key was found and there were no errors, the document will look as follows:
+```
+{
+    "success": true
+}
+```
+If there was a problem the JSON document will look like this:
+```
+{
+    "Error": "A description of the error"
+}
+```
 #### DELETE
-To get a value from the table query the address `http://host:port/{key}`, where `{key}` is the key you want to delete from the table.
-
+To delete a key-value pair query the address `http://host:port/keys/{key}`, where `{key}` is the key you want to delete.
+If the key was deleted correctly, the returned JSON document will look as follows:
+```
+{
+    "success": true
+}
+```
+If there was a problem the JSON document will look like this:
+```
+{
+    "Error": "A description of the error"
+}
+```
 ## License
 
 Apache License
