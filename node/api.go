@@ -1,17 +1,19 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/zillolo/dht"
 )
 
 var server *dht.Node
+
+type pair struct {
+	Key   string
+	Value string
+}
 
 func InitAPI(host string, node *dht.Node) {
 	if node == nil {
@@ -20,62 +22,88 @@ func InitAPI(host string, node *dht.Node) {
 	}
 	server = node
 
-	router := NewRouter()
-	http.ListenAndServe(host, router)
+	// router := NewRouter()
+	// http.ListenAndServe(host, router)
+	api := rest.NewApi()
+	api.Use(rest.DefaultDevStack...)
+	router, err := rest.MakeRouter(
+		rest.Get("/keys", HandleGetAll),
+		rest.Get("/status", HandleStatus),
+		rest.Get("/keys/:key", HandleGet),
+		rest.Post("/keys", HandleSet),
+		rest.Delete("/keys/:key", HandleDelete),
+	)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+		return
+	}
+
+	api.SetApp(router)
+	http.ListenAndServe(host, api.MakeHandler())
 }
 
-func HandleSet(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	if err != nil {
-		panic(err)
+func HandleSet(w rest.ResponseWriter, r *rest.Request) {
+	var p pair
+	if err := r.DecodeJsonPayload(&p); err != nil {
+		log.Fatalf("Error during decoding of JSON payload.\n")
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
-	if err = r.Body.Close(); err != nil {
-		panic(err)
+	if p.Key == "" {
+		rest.Error(w, "country code required", 400)
+		return
 	}
-
-	var data map[string]interface{}
-	if err = json.Unmarshal(body, &data); err != nil {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(422) // unprocessable entity
-		if err = json.NewEncoder(w).Encode(err); err != nil {
-			panic(err)
+	if p.Value == "" {
+		rest.Error(w, "country name required", 400)
+		return
+	}
+	if err := server.Role().(*dht.Leader).Set(p.Key, p.Value); err != nil {
+		error := map[string]interface{}{"error": err.Error()}
+		if err := w.WriteJson(&error); err != nil {
+			log.Fatalf("%v\n", err)
+		}
+	} else {
+		response := map[string]interface{}{"success": true}
+		if err := w.WriteJson(&response); err != nil {
+			log.Fatalf("%v\n", err)
 		}
 	}
 
-	key := data["key"].(string)
-	value := data["value"].(string)
+}
 
-	err = server.Role().(*dht.Leader).Set(key, value)
+func HandleGet(w rest.ResponseWriter, r *rest.Request) {
+	key := r.PathParam("key")
+
+	value, err := server.Role().(*dht.Leader).Get(key)
 	if err != nil {
-		w.Write([]byte(err.Error()))
+		rest.NotFound(w, r)
+		return
 	} else {
-		w.Write([]byte("Success\n"))
+		response := map[string]interface{}{"value": value, "success": true}
+		if err := w.WriteJson(&response); err != nil {
+			log.Fatalf("%v\n", err)
+		}
 	}
 }
 
-func HandleGet(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	key := vars["key"]
-
-	key, err := server.Role().(*dht.Leader).Get(key)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-	} else {
-		w.Write([]byte(key))
-	}
+func HandleGetAll(w rest.ResponseWriter, r *rest.Request) {
+	rest.Error(w, "", 501)
 }
 
-func HandleDelete(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func HandleStatus(w rest.ResponseWriter, r *rest.Request) {
+	rest.Error(w, "", 501)
+}
 
-	key := vars["key"]
+func HandleDelete(w rest.ResponseWriter, r *rest.Request) {
+	key := r.PathParam("key")
 
 	err := server.Role().(*dht.Leader).Delete(key)
 	if err != nil {
-		w.Write([]byte(err.Error()))
+		rest.NotFound(w, r)
+		return
 	} else {
-		w.Write([]byte("Success"))
+		response := map[string]interface{}{"success": true}
+		if err := w.WriteJson(&response); err != nil {
+			log.Fatalf("%v\n", err)
+		}
 	}
 }
