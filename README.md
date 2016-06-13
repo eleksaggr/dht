@@ -1,5 +1,5 @@
 # dht
-*dht* is a distributed hash table written in Go.
+**dht** is a distributed hash table written in Go.
 ## Installation
 ```
 go get github.com/zillolo/dht
@@ -44,6 +44,28 @@ There are currently two types of roles for nodes:
 Follower nodes do not coordinate anything in the cluster. A Follower only cares about the requests it receives on its `serviceHost`. It can set a key-value pair in the table, get the appropiate value for a specific key or delete a key-value pair from the table.
 #### Leader
 Leader nodes are the coordinators of the cluster. A given cluster can only have one Leader. Followers must register themselves with the Leader of the cluster in order to operate. Every Leader is himself also a Follower. This means he is a Follower node like any other and can set, get or delete data.
+
+## REST API
+A Leader hosts a HTTP server on his `httpHost`. The following actions are available over HTTP:
+* **SET** - `httpHost/`
+* **GET** - `httpHost/{key}`
+* **DELETE** - `httpHost/{key}`
+
+#### SET
+To set a key-value pair send a JSON document to the address `http://httpHost/`. The JSON document should be formatted as follows:
+```
+{
+    "key": "[your key]",
+    "value": "[your value]"
+}
+```
+
+#### GET
+To get a value from the table query the address `http://httpHost/{key}`, where `{key}` is the key you want to get the value for.
+
+
+#### DELETE
+To get a value from the table query the address `http://httpHost/{key}`, where `{key}` is the key you want to delete from the table.
 
 ## License
 
