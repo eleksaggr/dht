@@ -28,7 +28,6 @@ func InitAPI(host string, node *dht.Node) {
 	api.Use(rest.DefaultDevStack...)
 	router, err := rest.MakeRouter(
 		rest.Get("/keys", HandleGetAll),
-		rest.Get("/status", HandleStatus),
 		rest.Get("/keys/:key", HandleGet),
 		rest.Post("/keys", HandleSet),
 		rest.Delete("/keys/:key", HandleDelete),
@@ -39,7 +38,11 @@ func InitAPI(host string, node *dht.Node) {
 	}
 
 	api.SetApp(router)
-	http.ListenAndServe(host, api.MakeHandler())
+
+	http.Handle("/", api.MakeHandler())
+	http.HandleFunc("/status", HandleStatus)
+
+	http.ListenAndServe(host, nil)
 }
 
 func HandleSet(w rest.ResponseWriter, r *rest.Request) {
@@ -89,8 +92,7 @@ func HandleGetAll(w rest.ResponseWriter, r *rest.Request) {
 	rest.Error(w, "", 501)
 }
 
-func HandleStatus(w rest.ResponseWriter, r *rest.Request) {
-	rest.Error(w, "", 501)
+func HandleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDelete(w rest.ResponseWriter, r *rest.Request) {

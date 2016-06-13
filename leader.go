@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -23,7 +24,8 @@ const (
 type Leader struct {
 	*Follower
 
-	cluster Cluster
+	cluster      Cluster
+	clusterMutex *sync.Mutex
 }
 
 // NewLeader initializes a new leader. It also starts the checkTimeout method.
@@ -34,8 +36,9 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 	}
 
 	leader = &Leader{
-		Follower: follower,
-		cluster:  make(Cluster, 0),
+		Follower:     follower,
+		cluster:      make(Cluster, 0),
+		clusterMutex: &sync.Mutex{},
 	}
 	leader.Follower.role = leader
 
@@ -78,7 +81,9 @@ func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
 func (leader *Leader) OnRegister(m *Message, w io.Writer) (err error) {
 	var id [16]byte
 	copy(id[:], m.GetId())
+	leader.clusterMutex.Lock()
 	leader.cluster.Add(uuid.UUID(id), m.GetHost())
+	leader.clusterMutex.Unlock()
 
 	return nil
 }
@@ -209,6 +214,10 @@ func (leader *Leader) Delete(key string) (err error) {
 	return nil
 }
 
+func (leader *Leader) Cluster() *Cluster {
+	return &leader.cluster
+}
+
 func (leader *Leader) checkTimeout() {
 	for {
 		select {
@@ -225,7 +234,9 @@ func (leader *Leader) checkTimeout() {
 						conn, err := net.Dial("tcp", member.Host)
 						if err != nil {
 							// Remove member from cluster, since he's dead.
+							leader.clusterMutex.Lock()
 							leader.cluster.Remove(member)
+							leader.clusterMutex.Unlock()
 						} else {
 							message := Message{
 								Action: Message_NOOP.Enum(),
