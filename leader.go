@@ -13,16 +13,20 @@ import (
 )
 
 const (
-	KEEPALIVE_TIMEOUT = time.Second * 8
-	LOOP_TIMEOUT      = time.Second * 2
+	// KeepAliveTimeout is the duration waited until a timeout check is performed on a node.
+	KeepAliveTimeout = time.Second * 8
+	// LoopTimeout is the duration waited until all nodes are checked for timeout again.
+	LoopTimeout = time.Second * 2
 )
 
+// Leader is an implementation of dht.Role that manages other nodes.
 type Leader struct {
 	*Follower
 
 	cluster Cluster
 }
 
+// NewLeader initializes a new leader. It also starts the checkTimeout method.
 func NewLeader(node *Node) (leader *Leader, err error) {
 	follower, err := NewFollower(node)
 	if err != nil {
@@ -33,7 +37,7 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 		Follower: follower,
 		cluster:  make(Cluster, 0),
 	}
-	leader.Follower.Assign(leader)
+	leader.Follower.role = leader
 
 	// Add self to the cluster.
 	leader.cluster.Add(leader.id, leader.host)
@@ -44,10 +48,12 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 	return leader, nil
 }
 
+// Register returns an error when called.
 func (leader *Leader) Register(leaderHost string) (err error) {
 	return errors.New("Cannot register a leader.")
 }
 
+// Handle handles the different types of messages a Leader must process.
 func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
 	fmt.Printf("Leader is handling message...\n")
 	err = leader.Follower.Handle(m, w)
@@ -64,6 +70,7 @@ func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
 	return err
 }
 
+// OnRegister is called when a node tries to register with the Leader.
 func (leader *Leader) OnRegister(m *Message, w io.Writer) (err error) {
 	fmt.Printf("Adding node to cluster...\n")
 	var id [16]byte
@@ -74,6 +81,7 @@ func (leader *Leader) OnRegister(m *Message, w io.Writer) (err error) {
 	return nil
 }
 
+// OnUnregister is called when a node tries to unregister itself with the Leader.
 func (leader *Leader) OnUnregister(m *Message, w io.Writer) (err error) {
 	return nil
 }
@@ -88,7 +96,7 @@ func (leader *Leader) checkTimeout() {
 				if member.ID == leader.id {
 					continue
 				}
-				if time.Since(member.LastAlive) > KEEPALIVE_TIMEOUT {
+				if time.Since(member.LastAlive) > KeepAliveTimeout {
 					go func(member *clusterMember) {
 						// Connect to the member to see if he's still alive.
 						conn, err := net.Dial("tcp", member.Host)
@@ -116,6 +124,6 @@ func (leader *Leader) checkTimeout() {
 				}
 			}
 		}
-		time.Sleep(LOOP_TIMEOUT)
+		time.Sleep(LoopTimeout)
 	}
 }

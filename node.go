@@ -10,10 +10,13 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
+// Type is the type of a node.
 type Type uint
 
 const (
-	LEADER   Type = iota
+	// LEADER is the type for the role dht.Leader
+	LEADER Type = iota
+	// FOLLOWER is the type for the role dht.Follower
 	FOLLOWER Type = iota
 )
 
@@ -77,14 +80,12 @@ func NewNode(host string, roleType Type) (node *Node, err error) {
 	return node, nil
 }
 
-func (node *Node) Assign(role Role) {
-	node.role = role
-}
-
+// Register registers the node with a Leader under the address leaderHost.
 func (node *Node) Register(leaderHost string) (err error) {
 	return node.role.Register(leaderHost)
 }
 
+// Run starts a loop, in which messages are handled until Stop is called.
 func (node *Node) Run() {
 loop:
 	for {
@@ -136,6 +137,11 @@ loop:
 	}
 	close(node.stop)
 	node.Close()
+}
+
+// Stop stops the Run-loop of this node.
+func (node *Node) Stop() {
+	node.stop <- true
 }
 
 // Role returns the role of the Node.

@@ -9,10 +9,12 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// Follower is an implementation dht.Role that is dependent upon a Leader.
 type Follower struct {
 	*Node
 }
 
+// NewFollower initializes a new Follower.
 func NewFollower(node *Node) (follower *Follower, err error) {
 	if node == nil {
 		return nil, errors.New("Node may not be nil.")
@@ -23,11 +25,7 @@ func NewFollower(node *Node) (follower *Follower, err error) {
 	}, nil
 }
 
-func (follower *Follower) Assign(role Role) (err error) {
-	follower.Node.Assign(role)
-	return nil
-}
-
+// Register registers a Follower with a Leader under the address leaderHost.
 func (follower *Follower) Register(leaderHost string) (err error) {
 	fmt.Printf("Connecting...\n")
 	conn, err := net.Dial("tcp", leaderHost)
@@ -54,6 +52,7 @@ func (follower *Follower) Register(leaderHost string) (err error) {
 	return nil
 }
 
+// Handle handles all message types a Follower must respond to.
 func (follower *Follower) Handle(m *Message, w io.Writer) (err error) {
 	fmt.Printf("Follower is handling message...\n")
 	switch m.GetAction() {
@@ -71,6 +70,7 @@ func (follower *Follower) Handle(m *Message, w io.Writer) (err error) {
 	return err
 }
 
+// OnGet is called when a message with type Message_GET is received.
 func (follower *Follower) OnGet(m *Message, w io.Writer) (err error) {
 	follower.mutex.Lock()
 	value, ok := follower.table[m.GetKey()]
@@ -94,6 +94,7 @@ func (follower *Follower) OnGet(m *Message, w io.Writer) (err error) {
 	return nil
 }
 
+// OnSet is called when a message with type Message_SET is received.
 func (follower *Follower) OnSet(m *Message, w io.Writer) (err error) {
 	follower.mutex.Lock()
 	follower.table[m.GetKey()] = m.GetValue()
@@ -102,6 +103,7 @@ func (follower *Follower) OnSet(m *Message, w io.Writer) (err error) {
 	return nil
 }
 
+// OnDelete is called when a message with type Message_DELETE is received.
 func (follower *Follower) OnDelete(m *Message, w io.Writer) (err error) {
 	follower.mutex.Lock()
 	delete(follower.table, m.GetKey())
@@ -110,6 +112,7 @@ func (follower *Follower) OnDelete(m *Message, w io.Writer) (err error) {
 	return nil
 }
 
+// OnNoop is called when a message with type Message_NOOP is received.
 func (follower *Follower) OnNoop(m *Message, w io.Writer) error {
 	return nil
 }
