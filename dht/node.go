@@ -9,28 +9,26 @@ import (
 
 func main() {
 
-	var host string
-	if len(os.Args) > 1 {
-		host = "localhost:7000"
+	if len(os.Args) > 4 {
+		return
+	} else if len(os.Args) == 4 {
+		if os.Args[3] == "--leader" {
+			node, err := dht.NewNode(os.Args[2], dht.LEADER)
+			if err != nil {
+				fmt.Printf("Error during node creation.\n")
+				return
+			}
+			go node.Run()
 
-		node, err := dht.NewNode(host, dht.LEADER)
+			InitAPI(os.Args[1], node)
+		}
+	} else if len(os.Args) == 3 {
+		node, err := dht.NewNode(os.Args[2], dht.FOLLOWER)
 		if err != nil {
-			fmt.Printf("%v\n", err)
+			fmt.Printf("Error during node creation.\n")
 			return
 		}
-		node.Run()
-	} else {
-		host = "localhost:8000"
-
-		node, err := dht.NewNode(host, dht.FOLLOWER)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-
-		if err := node.Register("localhost:7000"); err != nil {
-			fmt.Printf("%v\n", err)
-		}
+		node.Register(os.Args[1])
 		node.Run()
 	}
 }
