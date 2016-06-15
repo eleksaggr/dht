@@ -62,7 +62,7 @@ To set a key-value pair send a JSON document to the address `http://host:port/ke
 If the data is stored correctly the following response will be delivered:
 ```
 {
-    "success": true
+    "Success": true
 }
 ```
 If there was a problem the JSON document will look like this:
@@ -77,7 +77,7 @@ To get a key-value pair query the address `http://host:port/keys/{key}`, where `
 If the key was found and there were no errors, the document will look as follows:
 ```
 {
-    "success": true
+    "Value": [value]
 }
 ```
 If there was a problem the JSON document will look like this:
@@ -91,7 +91,7 @@ To delete a key-value pair query the address `http://host:port/keys/{key}`, wher
 If the key was deleted correctly, the returned JSON document will look as follows:
 ```
 {
-    "success": true
+    "Success": true
 }
 ```
 If there was a problem the JSON document will look like this:
