@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -23,7 +24,8 @@ const (
 type Leader struct {
 	*Follower
 
-	cluster Cluster
+	cluster      Cluster
+	clusterMutex *sync.Mutex
 }
 
 // NewLeader initializes a new leader. It also starts the checkTimeout method.
@@ -34,8 +36,9 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 	}
 
 	leader = &Leader{
-		Follower: follower,
-		cluster:  make(Cluster, 0),
+		Follower:     follower,
+		cluster:      make(Cluster, 0),
+		clusterMutex: &sync.Mutex{},
 	}
 	leader.Follower.role = leader
 
@@ -51,6 +54,10 @@ func NewLeader(node *Node) (leader *Leader, err error) {
 // Register returns an error when called.
 func (leader *Leader) Register(leaderHost string) (err error) {
 	return errors.New("Cannot register a leader.")
+}
+
+func (leader *Leader) Unregister() (err error) {
+	return errors.New("Cannot unregister a leader.")
 }
 
 // Handle handles the different types of messages a Leader must process.
@@ -78,13 +85,51 @@ func (leader *Leader) Handle(m *Message, w io.Writer) (err error) {
 func (leader *Leader) OnRegister(m *Message, w io.Writer) (err error) {
 	var id [16]byte
 	copy(id[:], m.GetId())
+	leader.clusterMutex.Lock()
 	leader.cluster.Add(uuid.UUID(id), m.GetHost())
+	leader.clusterMutex.Unlock()
 
 	return nil
 }
 
 // OnUnregister is called when a node tries to unregister itself with the Leader.
 func (leader *Leader) OnUnregister(m *Message, w io.Writer) (err error) {
+	var id [16]byte
+	copy(id[:], m.GetId())
+	keys, values, err := leader.GetAll(id)
+	if err != nil {
+		return err
+	}
+
+	var node *clusterMember
+	for _, member := range leader.cluster {
+		if member.ID == id {
+			node = member
+		}
+	}
+	leader.clusterMutex.Lock()
+	leader.cluster.Remove(node)
+	leader.clusterMutex.Unlock()
+
+	for i := 0; i < len(keys); i++ {
+		leader.Set(keys[i], values[i])
+	}
+
+	message := Message{
+		Action: Message_EXIT.Enum(),
+	}
+
+	data, err := proto.Marshal(&message)
+	if err != nil {
+		return err
+	}
+	conn, err := net.Dial("tcp", node.Host)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	conn.Write(data)
+
 	return nil
 }
 
@@ -121,6 +166,8 @@ func (leader *Leader) Set(key, value string) (err error) {
 			return err
 		}
 		conn.Write(data)
+
+		conn.Close()
 	}
 	return nil
 }
@@ -150,6 +197,8 @@ func (leader *Leader) Get(key string) (value string, err error) {
 	if err != nil {
 		return "", err
 	}
+	defer conn.Close()
+
 	data, err := proto.Marshal(&message)
 	if err != nil {
 		return "", err
@@ -171,6 +220,47 @@ func (leader *Leader) Get(key string) (value string, err error) {
 	}
 
 	return message.GetValue(), nil
+}
+
+func (leader *Leader) GetAll(id uuid.UUID) (keys []string, values []string, err error) {
+	var node *clusterMember
+	for _, member := range leader.cluster {
+		if member.ID == id {
+			node = member
+			break
+		}
+	}
+
+	message := Message{
+		Action: Message_GET_ALL.Enum(),
+	}
+
+	data, err := proto.Marshal(&message)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, err := net.Dial("tcp", node.Host)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn.Write(data)
+
+	buffer := make([]byte, 4096)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := proto.Unmarshal(buffer[0:n], &message); err != nil {
+		return nil, nil, err
+	}
+
+	keys = message.GetKeys()
+	values = message.GetValues()
+	conn.Close()
+
+	return keys, values, nil
 }
 
 // Delete advices the appropiate nodes to delete the key.
@@ -205,6 +295,7 @@ func (leader *Leader) Delete(key string) (err error) {
 			return err
 		}
 		conn.Write(data)
+		conn.Close()
 	}
 	return nil
 }
@@ -225,7 +316,9 @@ func (leader *Leader) checkTimeout() {
 						conn, err := net.Dial("tcp", member.Host)
 						if err != nil {
 							// Remove member from cluster, since he's dead.
+							leader.clusterMutex.Lock()
 							leader.cluster.Remove(member)
+							leader.clusterMutex.Unlock()
 						} else {
 							message := Message{
 								Action: Message_NOOP.Enum(),

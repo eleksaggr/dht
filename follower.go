@@ -51,8 +51,35 @@ func (follower *Follower) Register(leaderHost string) (err error) {
 	return nil
 }
 
+func (follower *Follower) Unregister() (err error) {
+	message := Message{
+		Action: Message_UNREGISTER.Enum(),
+		Id:     follower.id[:],
+	}
+
+	data, err := proto.Marshal(&message)
+	if err != nil {
+		return err
+	}
+
+	conn, err := net.Dial("tcp", follower.leaderHost)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	conn.Write(data)
+
+	return nil
+}
+
 // Handle handles all message types a Follower must respond to.
 func (follower *Follower) Handle(m *Message, w io.Writer) (err error) {
+	select {
+	case <-follower.signal:
+		follower.Unregister()
+	default:
+	}
+
 	switch m.GetAction() {
 	case Message_GET:
 		log.Printf("[EVENT]Follower handling GET.\n")
@@ -63,9 +90,15 @@ func (follower *Follower) Handle(m *Message, w io.Writer) (err error) {
 	case Message_DELETE:
 		log.Printf("[EVENT]Follower handling DELETE.\n")
 		err = follower.OnDelete(m, w)
+	case Message_GET_ALL:
+		log.Printf("[EVENT]Follower handling GET_ALL.\n")
+		err = follower.OnGetAll(m, w)
 	case Message_NOOP:
 		log.Printf("[EVENT]Follower handling NOOP.\n")
 		err = follower.OnNoop(m, w)
+	case Message_EXIT:
+		log.Printf("[EVENT]Follower handling EXIT.\n")
+		err = follower.OnExit(m, w)
 	default:
 		log.Printf("[EVENT]Follower handling fell through.\n")
 		err = errors.New("Unrecognized action in message.")
@@ -114,6 +147,37 @@ func (follower *Follower) OnDelete(m *Message, w io.Writer) (err error) {
 	follower.mutex.Unlock()
 
 	log.Printf("Table after Delete: %v\n", follower.table)
+	return nil
+}
+
+func (follower *Follower) OnGetAll(m *Message, w io.Writer) (err error) {
+	follower.mutex.Lock()
+	keys := make([]string, len(follower.table))
+	values := make([]string, len(follower.table))
+	i := 0
+	for k, v := range follower.table {
+		keys[i] = k
+		values[i] = v
+		i++
+	}
+	follower.mutex.Unlock()
+
+	message := Message{
+		Action: Message_GET_ALL.Enum(),
+		Keys:   keys,
+		Values: values,
+	}
+
+	data, err := proto.Marshal(&message)
+	if err != nil {
+		return err
+	}
+	w.Write(data)
+	return nil
+}
+
+func (follower *Follower) OnExit(m *Message, w io.Writer) (err error) {
+	follower.Stop()
 	return nil
 }
 
