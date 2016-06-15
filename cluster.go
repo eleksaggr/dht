@@ -27,10 +27,10 @@ func (cluster *Cluster) Add(id uuid.UUID, host string) {
 }
 
 // Remove removes a member from the cluster.
-func (cluster Cluster) Remove(member *clusterMember) {
-	for i, m := range cluster {
+func (cluster *Cluster) Remove(member *clusterMember) {
+	for i, m := range *cluster {
 		if m.ID == member.ID {
-			cluster = append(cluster[:i], cluster[i+1:]...)
+			*cluster = append((*cluster)[:i], (*cluster)[i+1:]...)
 		}
 	}
 }
