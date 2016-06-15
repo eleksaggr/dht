@@ -3,7 +3,11 @@ package dht
 import (
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/nu7hatch/gouuid"
@@ -25,16 +29,18 @@ type Node struct {
 
 	// Network
 	host string
-	net.Listener
+	*net.TCPListener
 
 	// Role
-	role Role
+	role       Role
+	leaderHost string
 
 	// Table
 	table map[string]string
 	mutex *sync.Mutex
 
-	stop chan bool
+	signal chan os.Signal
+	stop   chan bool
 }
 
 // NewNode creates a new Node. The node listens for incoming connections on the address host.
@@ -54,14 +60,17 @@ func NewNode(host string, roleType Type) (node *Node, err error) {
 	node = &Node{
 		id: *id,
 
-		host:     host,
-		Listener: listener,
+		host:        host,
+		TCPListener: listener.(*net.TCPListener),
 
 		table: make(map[string]string),
 		mutex: &sync.Mutex{},
 
-		stop: make(chan bool, 1),
+		signal: make(chan os.Signal, 1),
+		stop:   make(chan bool, 1),
 	}
+	signal.Notify(node.signal, os.Interrupt)
+	signal.Notify(node.signal, syscall.SIGTERM)
 
 	var role Role
 	switch roleType {
@@ -83,6 +92,7 @@ func NewNode(host string, roleType Type) (node *Node, err error) {
 
 // Register registers the node with a Leader under the address leaderHost.
 func (node *Node) Register(leaderHost string) (err error) {
+	node.leaderHost = leaderHost
 	return node.role.Register(leaderHost)
 }
 
@@ -135,6 +145,9 @@ loop:
 
 // Stop stops the Run-loop of this node.
 func (node *Node) Stop() {
+	log.Printf("Stopping node...\n")
+	log.Printf("Timing out in controlled fashion...\n")
+	node.SetDeadline(time.Now().Add(3 * time.Second))
 	node.stop <- true
 }
 
