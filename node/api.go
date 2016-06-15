@@ -49,11 +49,11 @@ func HandleSet(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	if p.Key == "" {
-		rest.Error(w, "country code required", 400)
+		rest.Error(w, "Key is a required field.", 400)
 		return
 	}
 	if p.Value == "" {
-		rest.Error(w, "country name required", 400)
+		rest.Error(w, "Value is a required field.", 400)
 		return
 	}
 	if err := server.Role().(*dht.Leader).Set(p.Key, p.Value); err != nil {
@@ -62,7 +62,7 @@ func HandleSet(w rest.ResponseWriter, r *rest.Request) {
 			log.Fatalf("%v\n", err)
 		}
 	} else {
-		response := map[string]interface{}{"success": true}
+		response := map[string]interface{}{"Success": true}
 		if err := w.WriteJson(&response); err != nil {
 			log.Fatalf("%v\n", err)
 		}
@@ -77,11 +77,10 @@ func HandleGet(w rest.ResponseWriter, r *rest.Request) {
 	if err != nil {
 		rest.NotFound(w, r)
 		return
-	} else {
-		response := map[string]interface{}{"value": value, "success": true}
-		if err := w.WriteJson(&response); err != nil {
-			log.Fatalf("%v\n", err)
-		}
+	}
+	response := map[string]interface{}{"Value": value}
+	if err := w.WriteJson(&response); err != nil {
+		log.Fatalf("%v\n", err)
 	}
 }
 
@@ -100,10 +99,9 @@ func HandleDelete(w rest.ResponseWriter, r *rest.Request) {
 	if err != nil {
 		rest.NotFound(w, r)
 		return
-	} else {
-		response := map[string]interface{}{"success": true}
-		if err := w.WriteJson(&response); err != nil {
-			log.Fatalf("%v\n", err)
-		}
+	}
+	response := map[string]interface{}{"Success": true}
+	if err := w.WriteJson(&response); err != nil {
+		log.Fatalf("%v\n", err)
 	}
 }
